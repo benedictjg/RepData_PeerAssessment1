@@ -1,0 +1,113 @@
+---
+title: "Reproducible Research: Peer Assessment 1"
+output: 
+  html_document:
+    keep_md: true
+    knitr:
+        opts_knitr:
+            verbose: TRUE
+        opts_chunk:
+            echo: TRUE
+---
+
+
+## Loading and preprocessing the data
+Loading and examining the data
+```{r readdata, eval = TRUE, cache = TRUE}
+activity <- read.csv("activity.csv")
+str(activity)
+```
+Changing the date column to date format in R and summing data into days
+```{r formatdata, eval = TRUE, cache = TRUE}
+activity$date <- as.Date(activity$date)
+byday <- aggregate(steps ~ date, activity, sum)
+str(byday)
+```
+Making a histogram of the total number of steps per day
+```{r histogram, eval = TRUE, cache = TRUE}
+hist(byday$steps, xlab = "Number of Steps", main = "Steps per day", col = "blue")
+```
+
+## What is mean total number of steps taken per day?
+Calculating the mean by day
+```{r mean, eval=TRUE}
+stepmean <- round(mean(byday$steps, na.rm=TRUE))
+```
+Calculating the median
+```{r median, eval=TRUE}
+stepmedian <- median(byday$steps, na.rm=TRUE)
+```
+<li> the mean is ```r stepmean```
+<li> the median is ```r stepmedian```
+
+## What is the average daily activity pattern?
+```{r by_interval, eval = TRUE, cache=TRUE}
+byinterval <- aggregate(steps ~ interval, activity, mean)
+plot(byinterval$interval, byinterval$steps, type="l", lwd=2, xlab="interval", ylab="steps", main="Average Daily Activity Pattern")
+intmax <- which.max(byinterval$steps)
+intmax <- byinterval[intmax,1]
+```
+<li> The 5-minute interval with the maximum number of steps is ```r intmax```
+
+## Imputing missing values
+Calculating total NAs
+```{r imputing0, cache=TRUE, eval=TRUE}
+sum(is.na(activity[,1]))
+```
+
+Starting by inputting 0 in for NA's on 2012-10-01
+```{r imputing1, cache=TRUE, eval=TRUE}
+NAvect1 <- which(is.na(activity[,1])==TRUE & activity[,2]=="2012-10-01")
+imputed <- activity
+imputed[NAvect1,1] <- 0
+```
+
+Using Impute function from the Hmisc package
+```{r imputing2, cache=TRUE}
+library(Hmisc)
+imputed$steps <- impute(imputed$steps, fun=mean)
+```
+
+Finally, lets check to make sure we got rid of those NA's
+```{r imputing3, cache=TRUE, eval=TRUE}
+summary(imputed)
+```
+
+Now lets analyze and compare our imputed data
+```{r histogram2, eval = TRUE}
+imputedbyday <- aggregate(steps ~ date, imputed, sum)
+par(mfrow = c(1,2))
+hist(imputedbyday$steps, xlab = "Number of Steps", main = "Steps per day (imputed)", col = "red")
+hist(byday$steps, xlab = "Number of Steps", main = "Steps per day (original)", col = "blue")
+impstepmean <- round(mean(imputedbyday$steps))
+impstepmedian <- median(imputedbyday$steps)
+```
+<li>Original mean =```r stepmean``` Imputed mean=```r impstepmean```
+<li>Original median = ```r stepmedian``` Imputed median=```r impstepmedian```
+
+## Are there differences in activity patterns between weekdays and weekends?
+
+looping through data to create weekday/weekend factor
+```{r daytypes, eval = TRUE}
+imputed$weekday <- as.character(rep(NA))
+imputed$date <- as.POSIXct(imputed$date)
+imputed$weekday <- weekdays(imputed$date)
+for (i in 1:nrow(imputed)){
+    if (imputed[i,4]=="Monday" | imputed[i,4]=="Tuesday" | imputed[i,4]=="Wednesday" | imputed[i,4]=="Thursday" | imputed[i,4]=="Friday"){
+    imputed[i,4] <- "weekday"
+    } else {
+    imputed[i,4] <- "weekend"
+    }
+}
+imputed$weekday <- as.factor(imputed$weekday)
+```
+Aggregating interval means by daytype
+```{r impmeans3, eval=TRUE}
+imputedmeans <- aggregate(steps ~ interval + weekday, data = imputed, mean)
+```
+Making our plot
+```{r plot3, cache=TRUE, eval=TRUE}
+library(lattice)
+xyplot(steps ~ interval | weekday, imputedmeans, type = "l", lwd = 1, xlab="Interval", ylab="Steps", layout = c(1,2))
+```
+
